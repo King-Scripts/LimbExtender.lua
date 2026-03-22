@@ -236,22 +236,61 @@ function PlayerData:setupCharacter(char)
 		self.PartStreamable = nil
 	end
 
-	if parent._Streamable and typeof(parent._Streamable.new) == "function" then
-		self.PartStreamable = parent._Streamable.new(char, parent._settings.TARGET_LIMB)
-		if self.PartStreamable and typeof(self.PartStreamable.Observe) == "function" then
-			self.PartStreamable:Observe(function(part, trove)
-				if self._destroyed or not part then return end
+	local target = parent._settings.TARGET_LIMB
 
-				self:spoofSize(part)
-				self:modifyLimbProperties(part)
+if parent._Streamable and typeof(parent._Streamable.new) == "function" then
+    
+    -- LIMPIAR SI YA EXISTE
+    self.PartStreamable = nil
+    self.PartStreamables = {}
 
-				if parent._settings.USE_HIGHLIGHT then
-					if not self.highlight then
-						self.highlight = makeHighlight(parent._settings)
-					end
-					self.highlight.Adornee = part
-				end
+    if typeof(target) == "table" then
+        
+        for limbName, enabled in pairs(target) do
+            if enabled then
+                local stream = parent._Streamable.new(char, limbName)
 
+                if stream and typeof(stream.Observe) == "function" then
+                    stream:Observe(function(part, trove)
+                        if self._destroyed or not part then return end
+
+                        self:spoofSize(part)
+                        self:modifyLimbProperties(part)
+
+                        if parent._settings.USE_HIGHLIGHT then
+                            if not self.highlight then
+                                self.highlight = makeHighlight(parent._settings)
+                            end
+                            self.highlight.Adornee = part
+                        end
+                    end)
+                end
+
+                table.insert(self.PartStreamables, stream)
+            end
+        end
+
+    else
+        -- MODO NORMAL (1 limb)
+        self.PartStreamable = parent._Streamable.new(char, target)
+
+        if self.PartStreamable and typeof(self.PartStreamable.Observe) == "function" then
+            self.PartStreamable:Observe(function(part, trove)
+                if self._destroyed or not part then return end
+
+                self:spoofSize(part)
+                self:modifyLimbProperties(part)
+
+                if parent._settings.USE_HIGHLIGHT then
+                    if not self.highlight then
+                        self.highlight = makeHighlight(parent._settings)
+                    end
+                    self.highlight.Adornee = part
+                end
+            end)
+        end
+    end
+end
 				if self.player and typeof(self.player.CharacterRemoving) == "RBXScriptSignal" then
 					self.conns:Connect(self.player.CharacterRemoving, function()
 						self:restoreLimbProperties(part)
