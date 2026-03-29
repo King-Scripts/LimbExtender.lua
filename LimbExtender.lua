@@ -177,7 +177,10 @@ function PlayerData:modifyLimbProperties(limb)
 			limb.Massless = true
 		end
 	end
-	
+
+	if limbExtenderData.limbs then limbExtenderData.limbs[limb] = parent._limbStore[limb] end
+end
+
 function PlayerData:spoofSize(part)
 	if not part then return end
     local saved = part.Size
@@ -200,157 +203,162 @@ function PlayerData:spoofSize(part)
 end
 
 function PlayerData:setupCharacter(char)
-local parent = self._parent
-if not char or not parent then return end
-if not self.player then return end
-if typeof(self.player.GetPropertyChangedSignal) == "function" then
-local sig = self.player:GetPropertyChangedSignal("Team")
-if sig and typeof(sig.Connect) == "function" then
-self.conns:Connect(sig, function()
-if self._destroyed then return end
-local plr = self.player
-if not plr then return end
-self:Destroy()
-if parent and parent._playerTable and typeof(parent._playerTable) == "table" then
-parent._playerTable[plr.Name] = PlayerData.new(parent, plr)
-end
-end, ("Player_%s_TeamChanged"):format(self.player.Name))
-end
-end
-if parent:_isTeam(self.player) then return end
-local humanoid = char:FindFirstChildOfClass("Humanoid")
-if not humanoid or humanoid.Health <= 0 then return end
-if self.PartStreamable and typeof(self.PartStreamable.Destroy) == "function" then
-self.PartStreamable:Destroy()
-self.PartStreamable = nil
-end
-if parent._Streamable and typeof(parent._Streamable.new) == "function" then
-self.PartStreamable = parent._Streamable.new(char, parent._settings.TARGET_LIMB)
-if self.PartStreamable and typeof(self.PartStreamable.Observe) == "function" then
-self.PartStreamable:Observe(function(part, trove)
-if self._destroyed or not part then return end
-self:spoofSize(part)
-self:modifyLimbProperties(part)
-if parent._settings.USE_HIGHLIGHT then
-if not self.highlight then
-self.highlight = makeHighlight(parent._settings)
-end
-self.highlight.Adornee = part
-end
-if self.player and typeof(self.player.CharacterRemoving) == "RBXScriptSignal" then
-self.conns:Connect(self.player.CharacterRemoving, function()
-self:restoreLimbProperties(part)
-end, ("Player_%s_CharacterRemoving_%s"):format(self.player.Name, tostring(part)))
-end
-local deathEvent
-if parent._settings.RESET_LIMB_ON_DEATH2 then
-deathEvent = humanoid.HealthChanged
-else
-deathEvent = humanoid.Died
-end
-if deathEvent and typeof(deathEvent.Connect) == "function" then
-self.conns:Connect(deathEvent, function(hp)
-if not hp or hp <= 0 then
-self:restoreLimbProperties(part)
-end
-end, ("Player_%s_Death_%s"):format(self.player.Name, tostring(part)))
-end
-if trove and typeof(trove.Add) == "function" then
-self.conns:Add(function()
-self:restoreLimbProperties(part)
-end, ("Player_%s_TroveRestore_%s"):format(self.player.Name, tostring(part)))
-end
-end)
-end
-    -- =============================================
-    -- ANTIBUG: Evita que otros jugadores se vean flotando al bajarse de moto/carro
-    -- (Solo para la limb que elegiste en Target Limb)
-    -- =============================================
-    local targetLimbName = parent._settings.TARGET_LIMB
+	local parent = self._parent
+	if not char or not parent then return end
+	if not self.player then return end
 
-    if char and char ~= localPlayer.Character then
-        local humanoid = char:FindFirstChildOfClass("Humanoid")
-        if humanoid and not char:FindFirstChild("AntiBugVehicleTag") then
+	if typeof(self.player.GetPropertyChangedSignal) == "function" then
+		local sig = self.player:GetPropertyChangedSignal("Team")
+		if sig and typeof(sig.Connect) == "function" then
+			self.conns:Connect(sig, function()
+				
+				if self._destroyed then return end
 
-            humanoid:GetPropertyChangedSignal("SeatPart"):Connect(function()
-                if humanoid.SeatPart == nil then
-                    task.delay(0.5, function()
-                        local limb = char:FindFirstChild(targetLimbName)
-                        if limb and not self._destroyed then
-                            pcall(function()
-                                limb.Size = Vector3.new(parent._settings.LIMB_SIZE, parent._settings.LIMB_SIZE, parent._settings.LIMB_SIZE)
-                                limb.CanCollide = parent._settings.LIMB_CAN_COLLIDE
-                                if targetLimbName ~= "HumanoidRootPart" then
-                                    limb.Massless = true
-                                end
-                            end)
-                        end
-                    end)
-                end
+				local plr = self.player
+				if not plr then return end
+
+				self:Destroy()
+
+				if parent and parent._playerTable and typeof(parent._playerTable) == "table" then
+					parent._playerTable[plr.Name] = PlayerData.new(parent, plr)
+				end
+			end, ("Player_%s_TeamChanged"):format(self.player.Name))
+		end
+	end
+
+	if parent:_isTeam(self.player) then return end
+
+	local humanoid = char:FindFirstChildOfClass("Humanoid")
+	if not humanoid or humanoid.Health <= 0 then return end
+
+	if self.PartStreamable and typeof(self.PartStreamable.Destroy) == "function" then
+		self.PartStreamable:Destroy()
+		self.PartStreamable = nil
+	end
+
+	if parent._Streamable and typeof(parent._Streamable.new) == "function" then
+		self.PartStreamable = parent._Streamable.new(char, parent._settings.TARGET_LIMB)
+		if self.PartStreamable and typeof(self.PartStreamable.Observe) == "function" then
+			self.PartStreamable:Observe(function(part, trove)
+				if self._destroyed or not part then return end
+
+				self:spoofSize(part)
+				self:modifyLimbProperties(part)
+
+				if parent._settings.USE_HIGHLIGHT then
+					if not self.highlight then
+						self.highlight = makeHighlight(parent._settings)
+					end
+					self.highlight.Adornee = part
+				end
+
+				if self.player and typeof(self.player.CharacterRemoving) == "RBXScriptSignal" then
+					self.conns:Connect(self.player.CharacterRemoving, function()
+						self:restoreLimbProperties(part)
+					end, ("Player_%s_CharacterRemoving_%s"):format(self.player.Name, tostring(part)))
+				end
+
+				local deathEvent
+				if parent._settings.RESET_LIMB_ON_DEATH2 then
+					deathEvent = humanoid.HealthChanged
+				else
+					deathEvent = humanoid.Died
+				end
+
+				if deathEvent and typeof(deathEvent.Connect) == "function" then
+					self.conns:Connect(deathEvent, function(hp)
+						if not hp or hp <= 0 then
+							self:restoreLimbProperties(part)
+						end
+					end, ("Player_%s_Death_%s"):format(self.player.Name, tostring(part)))
+				end
+
+				if trove and typeof(trove.Add) == "function" then
+					self.conns:Add(function()
+						self:restoreLimbProperties(part)
+					end, ("Player_%s_TroveRestore_%s"):format(self.player.Name, tostring(part)))
+				end
+			end)
+		end
+	end
+	-- =============================================
+    -- NO COLLISION UPPER TORSO <-> LOWER TORSO
+    -- Versión AGRESIVA (la más efectiva)
+    -- =============================================
+    local function forceNoTorsoCollision(character)
+        if not character or not character.Parent then return end
+
+        local upper = character:FindFirstChild("UpperTorso") or character:WaitForChild("UpperTorso", 5)
+        local lower = character:FindFirstChild("LowerTorso") or character:WaitForChild("LowerTorso", 5)
+
+        if not (upper and lower) then return end
+
+        if upper:FindFirstChild("NoTorsoCollideTag") then return end
+
+        local RunService = game:GetService("RunService")
+
+        -- Usamos dos loops para mayor fuerza
+        local conn1 = RunService.Stepped:Connect(function()
+            pcall(function()
+                if upper and upper.Parent then upper.CanCollide = false end
+                if lower and lower.Parent then lower.CanCollide = false end
             end)
+        end)
 
-            local tag = Instance.new("BoolValue")
-            tag.Name = "AntiBugVehicleTag"
-            tag.Parent = char
+        local conn2 = RunService.Heartbeat:Connect(function()
+            pcall(function()
+                if upper and upper.Parent then upper.CanCollide = false end
+                if lower and lower.Parent then lower.CanCollide = false end
+            end)
+        end)
+
+        local tag = Instance.new("BoolValue")
+        tag.Name = "NoTorsoCollideTag"
+        tag.Parent = upper
+
+        -- Cleanup
+        local function cleanup()
+            if conn1 then conn1:Disconnect() end
+            if conn2 then conn2:Disconnect() end
         end
+
+        character.AncestryChanged:Connect(function()
+            if not character:IsDescendantOf(game) then
+                cleanup()
+            end
+        end)
+
+        -- Extra cleanup por si el tag se destruye
+        tag.Destroying:Connect(cleanup)
     end
 
-end  -- ← Este "end" cierra la función PlayerData:setupCharacter
-
--- =============================================
--- NO COLLISION UPPER TORSO <-> LOWER TORSO
--- Versión AGRESIVA
--- =============================================
-local function forceNoTorsoCollision(character)
-    if not character or not character.Parent then return end
-
-    local upper = character:FindFirstChild("UpperTorso") or character:WaitForChild("UpperTorso", 5)
-    local lower = character:FindFirstChild("LowerTorso") or character:WaitForChild("LowerTorso", 5)
-
-    if not (upper and lower) then return end
-    if upper:FindFirstChild("NoTorsoCollideTag") then return end
-
-    local RunService = game:GetService("RunService")
-
-    local conn1 = RunService.Stepped:Connect(function()
-        pcall(function()
-            if upper and upper.Parent then upper.CanCollide = false end
-            if lower and lower.Parent then lower.CanCollide = false end
-        end)
-    end)
-
-    local conn2 = RunService.Heartbeat:Connect(function()
-        pcall(function()
-            if upper and upper.Parent then upper.CanCollide = false end
-            if lower and lower.Parent then lower.CanCollide = false end
-        end)
-    end)
-
-    local tag = Instance.new("BoolValue")
-    tag.Name = "NoTorsoCollideTag"
-    tag.Parent = upper
-
-    local function cleanup()
-        if conn1 then conn1:Disconnect() end
-        if conn2 then conn2:Disconnect() end
-    end
-
-    character.AncestryChanged:Connect(function()
-        if not character:IsDescendantOf(game) then
-            cleanup()
+    -- Aplicar con delay más seguro
+    task.delay(0.8, function()
+        if self._destroyed then return end
+        if char and char.Parent then
+            forceNoTorsoCollision(char)
         end
     end)
+end -- ← Este "end" cierra la función PlayerData:setupCharacter
+function PlayerData:onCharacter(char)
+	if not char then return end
+	if self._charDelay then task.cancel(self._charDelay); self._charDelay = nil end
 
-    tag.Destroying:Connect(cleanup)
+	self._charDelay = task.delay(0.1, function()
+		if self._destroyed then return end
+
+		if self._parent._settings.FORCEFIELD_CHECK then
+			local ff = char:FindFirstChildOfClass("ForceField")
+			if ff then
+				self.conns:Connect(ff.Destroying, function()
+					self:setupCharacter(char)
+				end, ("Player_%s_ForceField_%s"):format(self.player.Name, tostring(char)))
+				return
+			end
+		end
+		self:setupCharacter(char)
+	end)
 end
-
--- Aplicar no collision al personaje actual
-task.delay(0.8, function()
-    if self._destroyed then return end
-    if char and char.Parent then
-        forceNoTorsoCollision(char)
-    end
-end)
 
 function PlayerData:Destroy()
 	if self._destroyed then return end
