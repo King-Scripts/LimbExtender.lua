@@ -126,25 +126,6 @@ function PlayerData:saveLimbProperties(limb)
 	}
 end
 
-function PlayerData:restoreLimbProperties(limb)
-	local parent = self._parent
-	if not limb then return end
-	local p = parent._limbStore[limb]
-	if not p then return end
-	if p.SizeConnection and typeof(p.SizeConnection) == "RBXScriptConnection" then p.SizeConnection:Disconnect() end
-	if p.TransparencyConnection and typeof(p.TransparencyConnection) == "RBXScriptConnection" then p.TransparencyConnection:Disconnect() end
-	if p.CollisionConnection and typeof(p.CollisionConnection) == "RBXScriptConnection" then p.CollisionConnection:Disconnect() end
-	if limb and limb.Parent then
-		limb.Size = p.OriginalSize
-		limb.Transparency = p.OriginalTransparency
-		limb.CanCollide = p.OriginalCanCollide
-		limb.Massless = p.OriginalMassless
-	end
-	parent._limbStore[limb] = nil
-
-	if limbExtenderData.limbs then limbExtenderData.limbs[limb] = nil end
-end
-
 function PlayerData:modifyLimbProperties(limb)
     local parent = self._parent
     if not limb then return end
@@ -162,12 +143,6 @@ function PlayerData:modifyLimbProperties(limb)
     -- FIX PARA NO BUGUEARSE AL BAJARSE DE VEHÍCULO
     -- (Sigue forzando todo normalmente)
     -- =============================================
-    local function isInVehicle()
-        local char = limb.Parent
-        if not char then return false end
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        return hum and hum.SeatPart ~= nil
-    end
 
     -- Watch properties (forzamos siempre)
     entry.SizeConnection = watchProperty(limb, "Size", function(l)
@@ -193,27 +168,35 @@ function PlayerData:modifyLimbProperties(limb)
         end
     end
 
-    -- Reset al bajarse del vehículo (esto evita el bug de cuerpo flotando)
+    -- Reset al bajarse del vehículo (evita bug de cuerpo flotando)
     local character = limb.Parent
     if character then
         local humanoid = character:FindFirstChildOfClass("Humanoid")
         if humanoid then
-            humanoid:GetPropertyChangedSignal("SeatPart"):Connect(function()
-                if humanoid.SeatPart == nil then
-                    -- Re-forzamos las propiedades al bajarse
-                    task.delay(0.2, function()
-                        if limb and limb.Parent and not self._destroyed then
-                            pcall(function()
-                                limb.Size = newSize
-                                limb.CanCollide = canCollide
-                                if parent._settings.TARGET_LIMB ~= "HumanoidRootPart" then
-                                    limb.Massless = true
-                                end
-                            end)
-                        end
-                    end)
-                end
-            end)
+            -- Conectamos solo una vez por personaje (no por limb)
+            if not character:FindFirstChild("VehicleResetConnection") then
+                local conn = humanoid:GetPropertyChangedSignal("SeatPart"):Connect(function()
+                    if humanoid.SeatPart == nil then
+                        -- Re-forzamos todo al bajarse
+                        task.delay(0.25, function()
+                            if limb and limb.Parent and not self._destroyed then
+                                pcall(function()
+                                    limb.Size = newSize
+                                    limb.CanCollide = canCollide
+                                    if parent._settings.TARGET_LIMB ~= "HumanoidRootPart" then
+                                        limb.Massless = true
+                                    end
+                                end)
+                            end
+                        end)
+                    end
+                end)
+
+                local tag = Instance.new("BoolValue")
+                tag.Name = "VehicleResetConnection"
+                tag.Parent = character
+                tag.Destroying:Connect(function() if conn then conn:Disconnect() end end)
+            end
         end
     end
 
@@ -221,6 +204,7 @@ function PlayerData:modifyLimbProperties(limb)
         limbExtenderData.limbs[limb] = parent._limbStore[limb] 
     end
 end
+
 	if limb and limb.Parent then
 		limb.Size = newSize
 		limb.Transparency = parent._settings.LIMB_TRANSPARENCY
