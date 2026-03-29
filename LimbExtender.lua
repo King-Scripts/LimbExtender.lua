@@ -221,15 +221,6 @@ function PlayerData:modifyLimbProperties(limb)
         limbExtenderData.limbs[limb] = parent._limbStore[limb] 
     end
 end
-	
-	entry.TransparencyConnection = watchProperty(limb, "Transparency", function(l)
-		l.Transparency = transparency
-	end)
-	
-	entry.CollisionConnection = watchProperty(limb, "CanCollide", function(l)
-		l.CanCollide = canCollide
-	end)
-
 	if limb and limb.Parent then
 		limb.Size = newSize
 		limb.Transparency = parent._settings.LIMB_TRANSPARENCY
