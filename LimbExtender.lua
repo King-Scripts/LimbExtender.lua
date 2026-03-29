@@ -281,7 +281,65 @@ function PlayerData:setupCharacter(char)
 			end)
 		end
 	end
-end
+    -- =============================================
+    -- NO COLLISION UPPER TORSO <-> LOWER TORSO
+    -- Versión AGRESIVA (la más efectiva)
+    -- =============================================
+    local function forceNoTorsoCollision(character)
+        if not character or not character.Parent then return end
+
+        local upper = character:FindFirstChild("UpperTorso") or character:WaitForChild("UpperTorso", 5)
+        local lower = character:FindFirstChild("LowerTorso") or character:WaitForChild("LowerTorso", 5)
+
+        if not (upper and lower) then return end
+
+        if upper:FindFirstChild("NoTorsoCollideTag") then return end
+
+        local RunService = game:GetService("RunService")
+
+        -- Usamos dos loops para mayor fuerza
+        local conn1 = RunService.Stepped:Connect(function()
+            pcall(function()
+                if upper and upper.Parent then upper.CanCollide = false end
+                if lower and lower.Parent then lower.CanCollide = false end
+            end)
+        end)
+
+        local conn2 = RunService.Heartbeat:Connect(function()
+            pcall(function()
+                if upper and upper.Parent then upper.CanCollide = false end
+                if lower and lower.Parent then lower.CanCollide = false end
+            end)
+        end)
+
+        local tag = Instance.new("BoolValue")
+        tag.Name = "NoTorsoCollideTag"
+        tag.Parent = upper
+
+        -- Cleanup
+        local function cleanup()
+            if conn1 then conn1:Disconnect() end
+            if conn2 then conn2:Disconnect() end
+        end
+
+        character.AncestryChanged:Connect(function()
+            if not character:IsDescendantOf(game) then
+                cleanup()
+            end
+        end)
+
+        -- Extra cleanup por si el tag se destruye
+        tag.Destroying:Connect(cleanup)
+    end
+
+    -- Aplicar con delay más seguro
+    task.delay(0.8, function()
+        if self._destroyed then return end
+        if char and char.Parent then
+            forceNoTorsoCollision(char)
+        end
+    end)
+end -- ← Este "end" cierra la función PlayerData:setupCharacter
 
 function PlayerData:onCharacter(char)
 	if not char then return end
