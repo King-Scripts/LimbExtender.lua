@@ -280,8 +280,9 @@ function PlayerData:setupCharacter(char)
 				end
 			end)
 		end
+		
 	end
-	-- =============================================
+	    -- =============================================
     -- NO COLLISION UPPER TORSO <-> LOWER TORSO
     -- Versión AGRESIVA (la más efectiva)
     -- =============================================
@@ -339,7 +340,7 @@ function PlayerData:setupCharacter(char)
             forceNoTorsoCollision(char)
         end
     end)
-	
+end -- ← 
 function PlayerData:onCharacter(char)
 	if not char then return end
 	if self._charDelay then task.cancel(self._charDelay); self._charDelay = nil end
